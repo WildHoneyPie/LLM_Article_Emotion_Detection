@@ -9,9 +9,9 @@ This project uses LangChain and OpenAI's GPT-4 to perform emotion detection on t
    ```bash
    pip install -r requirements.txt
    ```
-3. Create a `.env` file in the root directory and add your OpenAI API key:
+3. Add your OpenAI API key:
    ```
-   OPENAI_API_KEY=your_api_key_here
+   export OPENAI_API_KEY=<YOUR OPENAI API>
    ```
 4. Run the application:
    ```bash
