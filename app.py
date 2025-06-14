@@ -10,6 +10,24 @@ from typing import List, Dict
 # Load environment variables
 load_dotenv()
 
+# Custom CSS to apply Satoshi font only
+st.markdown("""
+<style>
+    /* Import Satoshi font */
+    @import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap');
+    
+    /* Apply Satoshi font to all elements */
+    html, body, [class*="css"] {
+        font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    }
+    
+    /* Ensure all text elements use Satoshi */
+    h1, h2, h3, h4, h5, h6, p, div, span, li, a, button, input, textarea, label {
+        font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Define the emotion analysis models
 class CircumplexEmotion(BaseModel):
     valence: float = Field(
@@ -26,7 +44,7 @@ class CircumplexEmotion(BaseModel):
         description="List of emotions detected with their confidence scores"
     )
     explanation: str = Field(
-        description="Brief explanation of the emotional state and why these scores were assigned"
+        description="Brief explanation of the emotional state and why these scores were assigned. The paragraph should be written out of the user's perspective with directly addressing the user, Don't use any 'paragraph' or 'paragraphs' in the explanation."
     )
 
 class ParagraphEmotion(BaseModel):
