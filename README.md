@@ -1,6 +1,6 @@
 # Real-time Text Emotion Detection
 
-This project uses LangChain and OpenAI's GPT-4 to perform real-time emotion detection on text input. The application provides a simple web interface where users can input text and receive emotion analysis.
+This project uses LangChain and OpenAI's GPT-4 to perform emotion detection on text input. The application provides a simple web interface where users can input text and receive emotion analysis.
 
 ## Setup
 
