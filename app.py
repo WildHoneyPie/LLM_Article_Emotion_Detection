@@ -6,6 +6,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 from typing import List, Dict
+import json
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -154,8 +156,61 @@ if st.button("Analyze Article"):
                         # Display explanation
                         st.write("**Explanation:**")
                         st.write(paragraph.circumplex.explanation)
-                
+
+                st.session_state['analysis_results'] = {
+                    'timestamp': datetime.now().isoformat(),
+                    'input_text': text_input,
+                    'analysis': {
+                        "overall_emotion_flow": article_analysis.overall_emotion_flow,
+                        "key_emotional_points": article_analysis.key_emotional_points,
+                        "paragraphs": [
+                            {
+                                "number": i + 1,
+                                "content": p.paragraph,
+                                "dominant_emotion": p.dominant_emotion,
+                                "valence": p.circumplex.valence,
+                                "arousal": p.circumplex.arousal,
+                                "emotions": p.circumplex.emotions,
+                                "explanation": p.circumplex.explanation
+                            }
+                            for i, p in enumerate(article_analysis.paragraphs)
+                        ]
+                    }
+                }
+                if 'analysis_results' in st.session_state:
+                    # Access the nested analysis data
+                    results = st.session_state['analysis_results']['analysis']
+                    
+                    # Transform results into Circumplex Model format
+                    total_paragraphs = len(results['paragraphs'])
+                    circumplex_results = {
+                        "paragraphs": []
+                    }
+                    
+                    # Calculate proportions
+                    for i, paragraph in enumerate(results['paragraphs']):
+                        start = i / total_paragraphs
+                        end = (i + 1) / total_paragraphs
+                        proportion = end - start
+                        
+                        circumplex_results["paragraphs"].append({
+                            "paragraph_number": paragraph['number'],
+                            "proportion": {
+                                "start": round(start, 3),
+                                "end": round(end, 3),
+                                "proportion": round(proportion, 3)
+                            },
+                            "emotions": {
+                                "valence": paragraph['valence'],
+                                "arousal": paragraph['arousal']
+                            }
+                        })
+                    
+                    # Display the results in a structured way
+                    st.subheader("Analysis Results in JSON")
+                    st.json(circumplex_results)
+                    print("Circumplex Model Results: " + str(circumplex_results))
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
-    else:
-        st.warning("Please enter an article to analyze.") 
+
+        

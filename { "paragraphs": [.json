@@ -1,0 +1,51 @@
+{  "paragraphs": [
+    {
+      "paragraph_number": 1,
+      "proportion": {
+        "start": 0.0,
+        "end": 0.246,
+        "proportion": 0.246
+      },
+      "emotions": {
+        "valence": 0.8,
+        "arousal": 0.3
+      }
+    },
+    {
+      "paragraph_number": 2,
+      "proportion": {
+        "start": 0.246,
+        "end": 0.552,
+        "proportion": 0.305
+      },
+      "emotions": {
+        "valence": -0.7,
+        "arousal": 0.7
+      }
+    },
+    {
+      "paragraph_number": 3,
+      "proportion": {
+        "start": 0.552,
+        "end": 0.794,
+        "proportion": 0.243
+      },
+      "emotions": {
+        "valence": 0.6,
+        "arousal": 0.4,
+      }
+    },
+    {
+      "paragraph_number": 4,
+      "proportion": {
+        "start": 0.794,
+        "end": 1.0,
+        "proportion": 0.206
+      },
+      "emotions": {
+        "valence": 0.5,
+        "arousal": 0.2,
+      }
+    }
+  ]
+}
