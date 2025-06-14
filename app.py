@@ -1,161 +1,141 @@
-import os
 import streamlit as st
-from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import PydanticOutputParser
-from pydantic import BaseModel, Field
-from typing import List, Dict
+import numpy as np
+from transformers import pipeline
+from datetime import datetime
+import json
+import os
 
-# Load environment variables
-load_dotenv()
+from audio_component import audio_player
 
-# Custom CSS to apply Satoshi font only
-st.markdown("""
-<style>
-    /* Import Satoshi font */
-    @import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap');
-    
-    /* Apply Satoshi font to all elements */
-    html, body, [class*="css"] {
-        font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-    }
-    
-    /* Ensure all text elements use Satoshi */
-    h1, h2, h3, h4, h5, h6, p, div, span, li, a, button, input, textarea, label {
-        font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# Define the emotion analysis models
-class CircumplexEmotion(BaseModel):
-    valence: float = Field(
-        description="Valence score from -1 (negative) to 1 (positive)",
-        ge=-1.0,
-        le=1.0
-    )
-    arousal: float = Field(
-        description="Arousal score from -1 (low) to 1 (high)",
-        ge=-1.0,
-        le=1.0
-    )
-    emotions: List[Dict[str, float]] = Field(
-        description="List of emotions detected with their confidence scores"
-    )
-    explanation: str = Field(
-        description="Brief explanation of the emotional state and why these scores were assigned. The paragraph should be written out of the user's perspective with directly addressing the user, Don't use any 'paragraph' or 'paragraphs' in the explanation."
-    )
-
-class ParagraphEmotion(BaseModel):
-    paragraph: str = Field(description="The text content of the paragraph")
-    circumplex: CircumplexEmotion = Field(description="Circumplex model analysis of the paragraph")
-    dominant_emotion: str = Field(description="The most prominent emotion in this paragraph")
-
-class ArticleAnalysis(BaseModel):
-    paragraphs: List[ParagraphEmotion] = Field(description="List of analyzed paragraphs with their emotions")
-    overall_emotion_flow: str = Field(description="Description of how emotions change throughout the article")
-    key_emotional_points: List[str] = Field(description="Key points where significant emotional changes occur")
-
-# Initialize the parsers
-paragraph_parser = PydanticOutputParser(pydantic_object=ParagraphEmotion)
-article_parser = PydanticOutputParser(pydantic_object=ArticleAnalysis)
-
-# Create the prompt templates
-segmentation_prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are an expert at analyzing emotional content in text using the Circumplex Model of Affect. 
-    Your task is to:
-    1. Read the entire article
-    2. Identify natural breaks in emotional content
-    3. Split the article into paragraphs based on emotional changes
-    4. For each paragraph, analyze the emotional content using the Circumplex Model:
-       - Valence: Score from -1 (negative) to 1 (positive)
-       - Arousal: Score from -1 (low) to 1 (high)
-    5. Identify the dominant emotion in each paragraph
-    
-    {format_instructions}
-    """),
-    ("user", "{text}")
-])
-
-paragraph_analysis_prompt = ChatPromptTemplate.from_messages([
-    ("system", """You are an expert at analyzing emotions in text using the Circumplex Model of Affect.
-    Analyze the given paragraph and provide:
-    1. Valence score (-1 to 1): How positive or negative the emotional tone is
-    2. Arousal score (-1 to 1): How activated or deactivated the emotional state is
-    3. List of specific emotions with confidence scores
-    4. Detailed explanation of the emotional analysis
-    
-    {format_instructions}
-    """),
-    ("user", "{text}")
-])
-
-# Initialize the LLM
-llm = ChatOpenAI(
-    model="gpt-4",
-    temperature=0,
-    api_key=os.getenv("OPENAI_API_KEY")
+# Set page config
+st.set_page_config(
+    page_title="EchoDiary - Feel Your Days in Music",
+    page_icon="🎵",
+    layout="wide"
 )
 
-# Create the chains
-segmentation_chain = segmentation_prompt | llm | article_parser
-paragraph_chain = paragraph_analysis_prompt | llm | paragraph_parser
+# Initialize session state for playback control
+if "play_audio" not in st.session_state:
+    st.session_state.play_audio = False
+if "audio_bytes" not in st.session_state:
+    st.session_state.audio_bytes = None
 
-# Streamlit UI
-st.title("Article Emotion Analysis with Circumplex Model")
-st.write("Enter your article below for emotion analysis:")
+try:
+    # Open the local audio file in binary read mode
+    with open("music/110_Bm_KlessPad_01_TL.wav", "rb") as audio_file:
+        audio_bytes = audio_file.read()
 
-# Text input
-text_input = st.text_area("Input Article", height=300, key="text_input")
+        audio_player(audio_bytes=audio_bytes, key="local_player")
 
-if st.button("Analyze Article"):
-    if text_input:
-        with st.spinner("Analyzing article structure and emotions..."):
-            try:
-                # First stage: Analyze and segment the article
-                article_analysis = segmentation_chain.invoke({
-                    "text": text_input,
-                    "format_instructions": article_parser.get_format_instructions()
-                })
+except FileNotFoundError:
+    st.error(f"File not found: ''")
+    st.info(
+        "Please make sure the audio file exists in the same directory as app.py"
+    )
+
+# Initialize session state
+if 'journal_entries' not in st.session_state:
+    st.session_state.journal_entries = []
+
+# Initialize models
+@st.cache_resource
+def load_models():
+    # Text sentiment analysis
+    sentiment_analyzer = pipeline("sentiment-analysis", model="distilbert-base-uncased-finetuned-sst-2-english")
+    return sentiment_analyzer
+
+# Function to save entries
+def save_entries():
+    with open('journal_entries.json', 'w') as f:
+        json.dump(st.session_state.journal_entries, f)
+
+# Function to load entries
+def load_entries():
+    if os.path.exists('journal_entries.json'):
+        with open('journal_entries.json', 'r') as f:
+            st.session_state.journal_entries = json.load(f)
+
+# Load existing entries
+load_entries()
+
+# Initialize models
+sentiment_analyzer = load_models()
+
+# Title and description
+st.title("🎵 EchoDiary - Feel Your Days in Music")
+st.markdown("""
+    Capture your emotions through text and transform them into musical experiences.
+""")
+
+# Sidebar navigation
+st.sidebar.header("Navigation")
+page = st.sidebar.radio("Go to", ["New Entry", "View Entries", "About"])
+
+if page == "New Entry":
+    st.header("Create New Journal Entry")
+    
+    # Create columns for the layout
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Journal entry form
+        with st.form("journal_entry_form"):
+            title = st.text_input("Title")
+            content = st.text_area("Write your thoughts here...", height=200)
+            submitted = st.form_submit_button("Save Entry")
+            
+            if submitted and content:
+                # Analyze text sentiment
+                sentiment = sentiment_analyzer(content)[0]
                 
-                # Display overall emotion flow
-                st.subheader("Overall Emotion Flow")
-                st.write(article_analysis.overall_emotion_flow)
+                entry = {
+                    "title": title or "Untitled",
+                    "content": content,
+                    "sentiment": sentiment['label'],
+                    "sentiment_score": sentiment['score'],
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
                 
-                # Display key emotional points
-                st.subheader("Key Emotional Points")
-                for point in article_analysis.key_emotional_points:
-                    st.write(f"• {point}")
-                
-                # Display detailed paragraph analysis
-                st.subheader("Detailed Paragraph Analysis")
-                for i, paragraph in enumerate(article_analysis.paragraphs, 1):
-                    with st.expander(f"Paragraph {i} - {paragraph.dominant_emotion}"):
-                        st.write("**Content:**")
-                        st.write(paragraph.paragraph)
-                        
-                        # Display Circumplex Model scores
-                        st.write("**Circumplex Model Analysis:**")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("Valence", f"{paragraph.circumplex.valence:.2f}", 
-                                    delta=None, delta_color="normal")
-                        with col2:
-                            st.metric("Arousal", f"{paragraph.circumplex.arousal:.2f}", 
-                                    delta=None, delta_color="normal")
-                        
-                        # Display emotions breakdown
-                        st.write("**Emotion Breakdown:**")
-                        for emotion in paragraph.circumplex.emotions:
-                            for emotion_name, confidence in emotion.items():
-                                st.write(f"- {emotion_name}: {confidence:.2%}")
-                        
-                        # Display explanation
-                        st.write("**Explanation:**")
-                        st.write(paragraph.circumplex.explanation)
-                
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
+                st.session_state.journal_entries.append(entry)
+                save_entries()
+                st.success("Entry saved successfully! ✨")
+
+elif page == "View Entries":
+    st.header("Your Journal Entries")
+    
+    if not st.session_state.journal_entries:
+        st.info("No entries yet. Start writing in your journal!")
     else:
-        st.warning("Please enter an article to analyze.") 
+        # Sort entries by date (newest first)
+        sorted_entries = sorted(
+            st.session_state.journal_entries,
+            key=lambda x: x.get("date", ""),
+            reverse=True
+        )
+        
+        for entry in sorted_entries:
+            with st.expander(f"{entry.get('date', 'No date')} - {entry.get('title', 'Untitled')}"):
+                st.write(entry.get('content', 'No content'))
+                
+                # Display sentiment
+                if entry.get('sentiment'):
+                    st.write("Sentiment:", entry['sentiment'])
+                
+                # Add delete button
+                if st.button(f"Delete Entry", key=entry.get('date', 'no_date')):
+                    st.session_state.journal_entries.remove(entry)
+                    save_entries()
+                    st.rerun()
+
+else:  # About page
+    st.header("About EchoDiary")
+    st.write("""
+    EchoDiary is an AI-powered journaling experience that captures your emotions through:
+    
+    - 📝 Written text analysis
+    - 🎼 AI-generated musical representations
+    
+    Your entries are transformed into a unique musical experience, helping you feel your memories through sound.
+    """)
+    
+    st.info("Start your emotional journaling journey today! ✨") 
