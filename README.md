@@ -18,12 +18,6 @@ This project uses LangChain and OpenAI's GPT-4 to perform real-time emotion dete
    streamlit run app.py
    ```
 
-## Features
-
-- Real-time emotion detection using GPT-4
-- Web interface for easy interaction
-- Detailed emotion analysis with confidence scores
-- Support for multiple emotions in a single text
 
 ## Requirements
 
